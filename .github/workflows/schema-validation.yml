@@ -55,7 +55,6 @@ jobs:
             # Check against protected directories (prefix match)
             while IFS= read -r pd; do
               [ -z "$pd" ] && continue
-              # Use case for safe prefix matching (no regex issues)
               case "$file" in
                 "${pd}"*) VIOLATIONS="${VIOLATIONS}Protected directory file modified: ${file}\n" ;;
               esac
@@ -82,6 +81,6 @@ jobs:
         run: |
           echo "All checks passed and PR is content-only."
           echo "Auto-merge eligible per project-schema.yaml."
-          gh pr merge ${{ github.event.pull_request.number }} --auto --squash
+          gh pr merge ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --auto --squash
         env:
           GH_TOKEN: ${{ github.token }}
