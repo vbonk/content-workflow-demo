@@ -33,15 +33,18 @@ jobs:
             exit 0
           fi
 
-          # Parse protected files from schema (simple grep approach)
-          PROTECTED_FILES=$(grep -A 100 '^protected:' project-schema.yaml | grep -A 50 '  files:' | grep '    - ' | sed 's/.*- "\(.*\)"/\1/' | head -20)
-          PROTECTED_DIRS=$(grep -A 100 '^protected:' project-schema.yaml | grep -A 50 '  directories:' | grep '    - ' | sed 's/.*- "\(.*\)"/\1/' | head -20)
+          # Parse protected section using awk (stops at next top-level key)
+          PROTECTED_FILES=$(awk '/^protected:/{found=1; next} found && /^  files:/{in_files=1; next} found && in_files && /^    - /{gsub(/.*- "/,""); gsub(/".*/,""); print; next} found && in_files && /^  [a-z]/{in_files=0} /^[a-z]/ && !/^protected:/{found=0}' project-schema.yaml)
+          PROTECTED_DIRS=$(awk '/^protected:/{found=1; next} found && /^  directories:/{in_dirs=1; next} found && in_dirs && /^    - /{gsub(/.*- "/,""); gsub(/".*/,""); print; next} found && in_dirs && /^  [a-z]/{in_dirs=0} /^[a-z]/ && !/^protected:/{found=0}' project-schema.yaml)
+
+          echo "Protected files: $PROTECTED_FILES"
+          echo "Protected dirs: $PROTECTED_DIRS"
 
           VIOLATIONS=""
           while IFS= read -r file; do
             [ -z "$file" ] && continue
 
-            # Check against protected files
+            # Check against protected files (exact match)
             while IFS= read -r pf; do
               [ -z "$pf" ] && continue
               if [ "$file" = "$pf" ]; then
@@ -49,12 +52,13 @@ jobs:
               fi
             done <<< "$PROTECTED_FILES"
 
-            # Check against protected directories
+            # Check against protected directories (prefix match)
             while IFS= read -r pd; do
               [ -z "$pd" ] && continue
-              if echo "$file" | grep -q "^${pd}"; then
-                VIOLATIONS="${VIOLATIONS}Protected directory file modified: ${file}\n"
-              fi
+              # Use case for safe prefix matching (no regex issues)
+              case "$file" in
+                "${pd}"*) VIOLATIONS="${VIOLATIONS}Protected directory file modified: ${file}\n" ;;
+              esac
             done <<< "$PROTECTED_DIRS"
           done <<< "$CHANGED"
 
