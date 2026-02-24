@@ -1,0 +1,40 @@
+# project-schema.yaml — Machine-readable site specification
+# CI validates PRs against this schema. Agents respect these boundaries.
+
+name: "content-workflow-demo"
+version: 1
+
+# Files/dirs agents must NEVER modify — CI fails if PR touches these
+protected:
+  files:
+    - "project-schema.yaml"
+    - "content-spec.json"
+    - "package.json"
+    - "README.md"
+  directories:
+    - ".github/workflows/"
+
+# Files/dirs agents ARE allowed to modify
+modifiable:
+  content:
+    - "src/content/blog/**/*.md"
+
+# Deployment configuration
+deployment:
+  branch: "main"
+
+  # PRs touching ONLY these paths auto-merge if CI passes
+  auto_merge:
+    - "src/content/blog/**"
+
+  # PRs touching these paths always need human review
+  require_review:
+    - "project-schema.yaml"
+    - "content-spec.json"
+    - ".github/workflows/**"
+    - "package.json"
+
+# SEO constraints applied during validation
+seo:
+  max_title_length: 60
+  max_description_length: 160

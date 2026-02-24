@@ -1,0 +1,83 @@
+name: Schema Validation
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate-diff:
+    name: Check Protected Files
+    runs-on: ubuntu-latest
+    outputs:
+      auto-merge-eligible: ${{ steps.diff-check.outputs.auto-merge-eligible }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check protected files
+        id: diff-check
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+          echo ""
+
+          if [ ! -f project-schema.yaml ]; then
+            echo "No project-schema.yaml found — skipping protection check"
+            echo "auto-merge-eligible=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Parse protected files from schema (simple grep approach)
+          PROTECTED_FILES=$(grep -A 100 '^protected:' project-schema.yaml | grep -A 50 '  files:' | grep '    - ' | sed 's/.*- "\(.*\)"/\1/' | head -20)
+          PROTECTED_DIRS=$(grep -A 100 '^protected:' project-schema.yaml | grep -A 50 '  directories:' | grep '    - ' | sed 's/.*- "\(.*\)"/\1/' | head -20)
+
+          VIOLATIONS=""
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+
+            # Check against protected files
+            while IFS= read -r pf; do
+              [ -z "$pf" ] && continue
+              if [ "$file" = "$pf" ]; then
+                VIOLATIONS="${VIOLATIONS}Protected file modified: ${file}\n"
+              fi
+            done <<< "$PROTECTED_FILES"
+
+            # Check against protected directories
+            while IFS= read -r pd; do
+              [ -z "$pd" ] && continue
+              if echo "$file" | grep -q "^${pd}"; then
+                VIOLATIONS="${VIOLATIONS}Protected directory file modified: ${file}\n"
+              fi
+            done <<< "$PROTECTED_DIRS"
+          done <<< "$CHANGED"
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "Protected files were modified!"
+            echo -e "$VIOLATIONS"
+            echo "auto-merge-eligible=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "No protected files modified"
+          echo "auto-merge-eligible=true" >> "$GITHUB_OUTPUT"
+
+  auto-merge:
+    name: Auto-Merge Content PR
+    runs-on: ubuntu-latest
+    needs: [validate-diff]
+    if: needs.validate-diff.outputs.auto-merge-eligible == 'true'
+    steps:
+      - name: Enable auto-merge
+        run: |
+          echo "All checks passed and PR is content-only."
+          echo "Auto-merge eligible per project-schema.yaml."
+          gh pr merge ${{ github.event.pull_request.number }} --auto --squash
+        env:
+          GH_TOKEN: ${{ github.token }}

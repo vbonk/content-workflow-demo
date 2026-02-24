@@ -1,0 +1,25 @@
+{
+  "type": "blog_post",
+  "target_dir": "src/content/blog",
+  "topics": [
+    "AI automation in web development",
+    "SEO best practices for 2026",
+    "Content pipeline architecture",
+    "Deterministic AI workflows",
+    "Schema-driven content validation"
+  ],
+  "tone": "professional, informative, practical",
+  "constraints": {
+    "title_max_length": 60,
+    "description_max_length": 160,
+    "body_min_words": 200,
+    "slug_pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    "required_fields": ["title", "description", "body", "slug", "date", "tags"]
+  },
+  "frontmatter_template": {
+    "layout": "post",
+    "author": "WebOps AI",
+    "draft": false
+  },
+  "instructions": "Generate a well-structured blog post on one of the provided topics. Include practical examples and actionable advice. The post should have clear sections with headers. Return valid JSON with all required fields."
+}
